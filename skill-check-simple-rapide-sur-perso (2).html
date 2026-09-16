@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skill Check Simple</title>
+  <style>
+    :root {
+      --bg: rgba(13, 18, 25, 0.97);
+      --line: rgba(255, 255, 255, 0.14);
+      --text: #f2f6fa;
+      --muted: #93a1af;
+      --green: #5ee092;
+      --red: #ff6572;
+      --blue: #4bd8e7;
+    }
+
+    * { box-sizing: border-box; user-select: none; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: transparent;
+      color: var(--text);
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      display: block;
+      transition: opacity 180ms ease;
+    }
+
+    .panel {
+      position: fixed;
+      top: 53vh;
+      left: 34vw;
+      width: 96px;
+      padding: 0;
+      text-align: center;
+    }
+
+    @media (max-width: 600px) {
+      .panel {
+        top: 53vh;
+        left: 34vw;
+        width: 84px;
+      }
+    }
+
+    .panel h1,
+    .panel .subtitle,
+    .panel .counter,
+    .panel .message,
+    .panel button,
+    .panel .key {
+      display: none;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 23px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .subtitle {
+      margin: 7px 0 18px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .counter {
+      margin-bottom: 24px;
+      color: var(--blue);
+      font: 700 12px monospace;
+      letter-spacing: 1px;
+    }
+
+    .track {
+      position: relative;
+      width: 96px;
+      height: 96px;
+      margin: 0;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.22);
+      border-radius: 50%;
+      background: #111820;
+      box-shadow:
+        0 3px 12px rgba(0,0,0,0.45),
+        inset 0 0 0 1px rgba(255,255,255,0.1);
+    }
+
+    @media (max-width: 600px) {
+      .track {
+        width: 84px;
+        height: 84px;
+      }
+    }
+
+    .target {
+      position: absolute;
+      inset: 0;
+      width: auto;
+      height: auto;
+      border-radius: 50%;
+      background: conic-gradient(
+        from -90deg,
+        transparent 0 var(--target-start),
+        var(--green) var(--target-start) var(--target-end),
+        transparent var(--target-end) 100%
+      );
+      filter: drop-shadow(0 0 5px rgba(94, 224, 146, 0.8));
+    }
+
+    .target::after {
+      content: "";
+      position: absolute;
+      inset: 9px;
+      border-radius: 50%;
+      background: #111820;
+    }
+
+    .marker {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 3px;
+      height: 39%;
+      z-index: 2;
+      border-radius: 3px;
+      background: white;
+      box-shadow: 0 0 7px white;
+      transform-origin: 50% 100%;
+      transform: translate(-50%, -100%) rotate(var(--marker-angle));
+    }
+
+    .track::after {
+      content: "";
+      position: absolute;
+      z-index: 3;
+      top: 50%;
+      left: 50%;
+      width: 8px;
+      height: 8px;
+      border: 2px solid rgba(255,255,255,0.9);
+      border-radius: 50%;
+      background: #17222d;
+      transform: translate(-50%, -50%);
+    }
+
+    .track canvas {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .key-e {
+      display: block;
+      margin-top: 8px;
+      color: rgba(242, 246, 250, 0.9);
+      font: 700 11px monospace;
+      letter-spacing: 0.8px;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+      white-space: nowrap;
+    }
+
+    .key-e span {
+      display: inline-grid;
+      width: 21px;
+      height: 19px;
+      margin-left: 3px;
+      place-items: center;
+      border: 1px solid rgba(255,255,255,0.7);
+      border-radius: 4px;
+      color: #fff;
+      background: rgba(20, 28, 37, 0.85);
+    }
+
+    .message {
+      min-height: 20px;
+      margin-bottom: 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .message.good { color: var(--green); }
+    .message.bad { color: var(--red); }
+
+    button {
+      min-width: 150px;
+      padding: 12px 18px;
+      border: 0;
+      border-radius: 9px;
+      color: #071217;
+      background: var(--blue);
+      cursor: pointer;
+      font: 700 12px monospace;
+    }
+    button:hover { filter: brightness(1.08); }
+    button.hidden { display: none; }
+
+    .key {
+      margin-top: 15px;
+      color: #748291;
+      font: 11px monospace;
+    }
+
+    .key-capture {
+      position: fixed;
+      left: -20px;
+      top: -20px;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+      border: 0;
+      outline: 0;
+    }
+
+    .success { border-color: rgba(94, 224, 146, 0.65); }
+    .failure { border-color: rgba(255, 101, 114, 0.65); }
+  </style>
+</head>
+<body>
+  <input id="key-capture" class="key-capture" type="text" autofocus aria-hidden="true">
+  <main class="panel" id="panel">
+    <h1>Skill Check</h1>
+    <div class="subtitle">Appuie quand la barre blanche est dans le vert.</div>
+    <div class="counter" id="counter">0 / 5</div>
+
+    <div class="track">
+      <div class="target" id="target"></div>
+      <div class="marker" id="marker"></div>
+    </div>
+    <div class="key-e">APPUYER <span>E</span></div>
+
+    <div class="message" id="message">Appuie sur lancer pour commencer.</div>
+    <button id="button" type="button">LANCER</button>
+    <div class="key">ESPACE : VALIDER &nbsp; • &nbsp; ÉCHAP : ANNULER</div>
+  </main>
+
+  <script>
+    class SimpleSkillCheck {
+      constructor() {
+        this.panel = document.getElementById('panel');
+        this.target = document.getElementById('target');
+        this.marker = document.getElementById('marker');
+        this.counter = document.getElementById('counter');
+        this.message = document.getElementById('message');
+        this.button = document.getElementById('button');
+        this.round = 0;
+        this.total = 4;
+        this.position = 0;
+        this.direction = 1;
+        this.targetStart = 0;
+        this.targetWidth = 22;
+        this.state = 'ready';
+        this.lastFrame = 0;
+        this.closeRequested = false;
+        this.audio = null;
+        this.keyCapture = document.getElementById('key-capture');
+
+        this.button.addEventListener('click', () => {
+          if (this.state === 'ready') this.start();
+          else if (this.state === 'playing') this.check();
+        });
+        this.handleKey = (event) => {
+          if (event.repeat) return;
+          const key = String(event.key || '').toLowerCase();
+          const isActionKey = event.code === 'KeyE'
+            || key === 'e'
+            || event.code === 'Space'
+            || event.code === 'Enter';
+          if (event.key === 'Escape') this.finish(false);
+          if (isActionKey && this.state === 'ready') {
+            event.preventDefault();
+            this.start();
+          } else if (isActionKey && this.state === 'playing') {
+            event.preventDefault();
+            this.check();
+          }
+        };
+        document.addEventListener('keydown', this.handleKey, true);
+        this.keepKeyboardFocus = () => {
+          try {
+            window.focus();
+            this.keyCapture.focus({ preventScroll: true });
+          } catch (e) {}
+        };
+        window.addEventListener('mousedown', this.keepKeyboardFocus);
+        window.addEventListener('blur', () => setTimeout(this.keepKeyboardFocus, 40));
+        setTimeout(this.keepKeyboardFocus, 80);
+        requestAnimationFrame((time) => this.frame(time));
+      }
+
+      beep(frequency, duration, type = 'sine') {
+        try {
+          const Ctx = window.AudioContext || window.webkitAudioContext;
+          if (!Ctx) return;
+          if (!this.audio) this.audio = new Ctx();
+          if (this.audio.state === 'suspended') this.audio.resume().catch(() => {});
+          const now = this.audio.currentTime;
+          const oscillator = this.audio.createOscillator();
+          const gain = this.audio.createGain();
+          oscillator.type = type;
+          oscillator.frequency.value = frequency;
+          gain.gain.setValueAtTime(0.0001, now);
+          gain.gain.exponentialRampToValueAtTime(0.08, now + 0.008);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+          oscillator.connect(gain);
+          gain.connect(this.audio.destination);
+          oscillator.start(now);
+          oscillator.stop(now + duration + 0.02);
+        } catch (e) {}
+      }
+
+      setTarget() {
+        this.targetStart = 8 + Math.random() * 70;
+        this.target.style.setProperty('--target-start', `${this.targetStart}%`);
+        this.target.style.setProperty(
+          '--target-end',
+          `${this.targetStart + this.targetWidth}%`
+        );
+        this.position = Math.random() > 0.5 ? 0 : 100;
+        this.direction = this.position === 0 ? 1 : -1;
+      }
+
+      start() {
+        this.state = 'playing';
+        this.round = 0;
+        this.targetWidth = 22;
+        this.panel.className = 'panel';
+        this.button.classList.add('hidden');
+        this.message.className = 'message';
+        this.message.textContent = 'Appuie au bon moment.';
+        this.setTarget();
+        this.update();
+      }
+
+      update() {
+        this.counter.textContent = `${this.round} / ${this.total}`;
+        this.marker.style.setProperty('--marker-angle', `${this.position * 3.6}deg`);
+      }
+
+      check() {
+        if (this.state !== 'playing') return;
+        const inside = this.position >= this.targetStart
+          && this.position <= this.targetStart + this.targetWidth;
+
+        if (!inside) {
+          // Un seul raté suffit : le mini-jeu s'arrête immédiatement.
+          this.state = 'failed';
+          this.panel.className = 'panel failure';
+          this.message.className = 'message bad';
+          this.message.textContent = 'Raté.';
+          setTimeout(() => this.finish(false), 250);
+          return;
+        }
+
+        this.round++;
+        this.state = 'feedback';
+        this.update();
+        if (this.round >= this.total) {
+          this.state = 'won';
+          this.panel.className = 'panel success';
+          this.message.className = 'message good';
+          this.message.textContent = 'Réparation réussie.';
+          setTimeout(() => this.finish(true), 500);
+          return;
+        }
+
+        this.targetWidth = Math.max(14, this.targetWidth - 3);
+        this.message.className = 'message good';
+        this.message.textContent = 'Bien joué. Encore une fois.';
+        setTimeout(() => {
+          if (this.state !== 'feedback') return;
+          this.state = 'playing';
+          this.setTarget();
+        }, 160);
+      }
+
+      frame(time) {
+        const delta = this.lastFrame ? Math.min(0.04, (time - this.lastFrame) / 1000) : 0;
+        this.lastFrame = time;
+        if (this.state === 'playing') {
+          this.position += this.direction * (82 + this.round * 8) * delta;
+          if (this.position >= 100) { this.position = 100; this.direction = -1; }
+          if (this.position <= 0) { this.position = 0; this.direction = 1; }
+          this.update();
+        }
+        requestAnimationFrame((next) => this.frame(next));
+      }
+
+      finish(success) {
+        if (this.closeRequested) return;
+        this.closeRequested = true;
+        const isFiveM = typeof window.GetParentResourceName === 'function';
+        const isExternal = /\.netlify\.app$/i.test(window.location.hostname) || !isFiveM;
+        const resourceName = isFiveM ? window.GetParentResourceName() : 'minigame';
+        const leaveUrl = isExternal ? 'https://external-iframe/leave' : `https://${resourceName}/leave`;
+        const request = fetch(leaveUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+          body: JSON.stringify({ success: !!success }),
+          keepalive: true
+        }).catch(() => {});
+
+        Promise.race([
+          request,
+          new Promise(resolve => setTimeout(resolve, 650))
+        ]).then(() => {
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ action: 'close', success: !!success, game: 'simple-skill-check' }, '*');
+          }
+          document.body.style.pointerEvents = 'none';
+          document.body.style.opacity = '0';
+          setTimeout(() => { document.body.style.display = 'none'; }, 180);
+        });
+      }
+    }
+
+    class ReliableCircleSkillCheck {
+      constructor() {
+        this.track = document.querySelector('.track');
+        this.track.innerHTML = '<canvas id="reliable-skill-canvas"></canvas>';
+        this.canvas = document.getElementById('reliable-skill-canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.capture = document.getElementById('key-capture');
+        this.round = 0;
+        this.total = 4;
+        this.state = 'playing';
+        this.angle = 0;
+        this.targetCenter = 0;
+        this.targetSize = 0.82;
+        this.speed = 3.8;
+        this.lastFrame = 0;
+        this.closeRequested = false;
+
+        this.resize = this.resize.bind(this);
+        this.frame = this.frame.bind(this);
+        this.keepFocus = () => {
+          try {
+            window.focus();
+            this.capture.focus({ preventScroll: true });
+          } catch (e) {}
+        };
+
+        window.addEventListener('resize', this.resize);
+        window.addEventListener('mousedown', this.keepFocus);
+        document.addEventListener('keydown', (event) => {
+          if (event.repeat) return;
+          const key = String(event.key || '').toLowerCase();
+          if (key === 'escape') {
+            event.preventDefault();
+            this.finish(false);
+            return;
+          }
+          if (event.code === 'KeyE' || key === 'e') {
+            event.preventDefault();
+            this.check();
+          }
+        }, true);
+
+        this.resize();
+        this.newRound();
+        this.keepFocus();
+        requestAnimationFrame(this.frame);
+      }
+
+      resize() {
+        const rect = this.track.getBoundingClientRect();
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        this.canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+        this.canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        this.width = rect.width;
+        this.height = rect.height;
+      }
+
+      newRound() {
+        this.targetCenter = Math.random() * Math.PI * 2;
+        this.targetSize = Math.max(0.62, 0.82 - this.round * 0.03);
+        this.speed = 3.8 + this.round * 0.18;
+        this.angle = Math.random() * Math.PI * 2;
+      }
+
+      angleDistance(a, b) {
+        return Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+      }
+
+      check() {
+        if (this.state !== 'playing') return;
+
+        // Le test et le dessin utilisent exactement les mêmes angles.
+        if (this.angleDistance(this.angle, this.targetCenter) > this.targetSize / 2) {
+          this.state = 'failed';
+          setTimeout(() => this.finish(false), 250);
+          return;
+        }
+
+        this.round++;
+        if (this.round >= this.total) {
+          this.state = 'won';
+          setTimeout(() => this.finish(true), 300);
+          return;
+        }
+
+        // Verrouille l'étape pendant un court instant pour empêcher
+        // deux validations avec un seul maintien/appui de touche.
+        this.state = 'transition';
+        setTimeout(() => {
+          if (this.state !== 'transition') return;
+          this.newRound();
+          this.state = 'playing';
+        }, 160);
+      }
+
+      drawArc(cx, cy, radius, start, end, color, width, shadow = 0) {
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-Math.PI / 2);
+        if (shadow) {
+          ctx.shadowColor = color;
+          ctx.shadowBlur = shadow;
+        }
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, start, end);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      render() {
+        const ctx = this.ctx;
+        const cx = this.width / 2;
+        const cy = this.height / 2;
+        const radius = Math.min(this.width, this.height) * 0.37;
+        ctx.clearRect(0, 0, this.width, this.height);
+
+        this.drawArc(cx, cy, radius, 0, Math.PI * 2, '#17222d', 16);
+        this.drawArc(cx, cy, radius, 0, Math.PI * 2, 'rgba(255,255,255,0.17)', 1);
+
+        if (this.state === 'playing' || this.state === 'transition') {
+          this.drawArc(
+            cx,
+            cy,
+            radius,
+            this.targetCenter - this.targetSize / 2,
+            this.targetCenter + this.targetSize / 2,
+            '#5ee092',
+            12,
+            8
+          );
+        }
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-Math.PI / 2);
+        ctx.rotate(this.angle);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(radius + 4, 0);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 6;
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#19242e';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      frame(timestamp) {
+        const delta = this.lastFrame ? Math.min(0.04, (timestamp - this.lastFrame) / 1000) : 0;
+        this.lastFrame = timestamp;
+        if (this.state === 'playing') {
+          this.angle = (this.angle + this.speed * delta) % (Math.PI * 2);
+        }
+        this.render();
+        requestAnimationFrame(this.frame);
+      }
+
+      finish(success) {
+        if (this.closeRequested) return;
+        this.closeRequested = true;
+        const isFiveM = typeof window.GetParentResourceName === 'function';
+        const isExternal = /\.netlify\.app$/i.test(window.location.hostname) || !isFiveM;
+        const resourceName = isFiveM ? window.GetParentResourceName() : 'minigame';
+        const leaveUrl = isExternal ? 'https://external-iframe/leave' : `https://${resourceName}/leave`;
+        const request = fetch(leaveUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+          body: JSON.stringify({ success: !!success }),
+          keepalive: true
+        }).catch(() => {});
+
+        Promise.race([
+          request,
+          new Promise(resolve => setTimeout(resolve, 650))
+        ]).then(() => {
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+              action: 'close',
+              success: !!success,
+              game: 'simple-skill-check'
+            }, '*');
+          }
+          document.body.style.pointerEvents = 'none';
+          document.body.style.opacity = '0';
+          setTimeout(() => { document.body.style.display = 'none'; }, 180);
+        });
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => new ReliableCircleSkillCheck());
+  </script>
+</body>
+</html>
